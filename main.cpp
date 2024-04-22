@@ -5,57 +5,119 @@
 #include <unordered_map>
 #include <algorithm>
 #include <vector>
-    //liest das file und gibt die Lines aufgeteilt wieder zurück
-    std::unordered_map<std::string, int> readfile(std::string filename){
-        std::ifstream file(filename);
-        if (!file.is_open()) {
-            std::cerr << "Error opening file." << std::endl;
+
+using namespace std;
+
+struct Message {
+    string date;
+    string time;
+    string sender;
+    string content;
+};
+
+vector<Message> readfile(const string& filename) {
+    ifstream file(filename);
+    if (!file.is_open()) {
+        cerr << "Error opening file." << endl;
+        return {};
+    }
+
+    vector<Message> messages;
+
+    string line;
+    while (getline(file, line)) {
+       Message msg;
+        // Extract date
+        size_t firstDashPos = line.find('-');
+        if (firstDashPos != string::npos) {
+            msg.date = line.substr(0, firstDashPos);
+            line = line.substr(firstDashPos + 1); // Skip dash and space
         }
 
-        std::unordered_map<std::string, int> messageCount;
-        std::string line;
-        while (std::getline(file, line)) {
-            size_t firstColonPos = line.find(':');
-            if (firstColonPos != std::string::npos) {
-                size_t secondColonPos = line.find(':', firstColonPos + 1);
-                if (secondColonPos != std::string::npos && secondColonPos + 1 < line.length()) {
-                    std::string sender = line.substr(secondColonPos + 1, line.find(':', secondColonPos + 1) - secondColonPos - 1);
-                    messageCount[sender]++;
-                }
-            }
+        // Extract time
+        size_t secondDashPos = line.find('-', firstDashPos + 1); // Find next dash
+        if (secondDashPos != string::npos) {
+            msg.time = line.substr(firstDashPos + 2, secondDashPos - (firstDashPos + 2));
+            line = line.substr(secondDashPos + 1); // Skip dash and space
         }
-        file.close();
-        return messageCount;
+        // Extract sender (until the next colon)
+        size_t colonPos = line.find(':');
+        if (colonPos != string::npos) {
+            msg.sender = line.substr(0, colonPos);
+            line = line.substr(colonPos + 1 ); // Skip colon and space
+        }
+
+        // Content is the rest of the line
+        msg.content = line;
+
+        messages.push_back(msg);
     }
+
+    file.close();
+    return messages;
+}
+
+int  countMessagesBySender(const vector<Message>& messages, string Sender) {
+    int messageCount=0;
+    for (const auto& msg : messages) {
+        if (msg.sender == Sender)
+          messageCount++;
+    }
+    return messageCount;
+}
+
+int countILoveYouMessagesBySender(const vector<Message>& messages, const string& sender) {
+    int messageCount = 0;
+    for (const auto& msg : messages) {
+        if (msg.sender == sender && msg.content.find("I love you") != string::npos) {
+            messageCount++;
+        }
+    }
+    return messageCount;
+}
+// Function to find the sender who sent the most "I love you" or similar messages
+string findMostILoveYouSender(const vector<Message>& messages) {
+    string mostILoveYouSender;
+    int maxILoveYouCount = 0;
+    for (const auto& msg : messages) {
+        int count = countILoveYouMessagesBySender(messages, msg.sender);
+        if (count > maxILoveYouCount) {
+            maxILoveYouCount = count;
+            mostILoveYouSender = msg.sender;
+        }
+    }
+    return mostILoveYouSender;
+}
+
+void writefile(string outputFilename, const vector<Message>& messages){
+    ofstream outputFile(outputFilename);
+    try
+    {
+        if (!outputFile.is_open()) {
+        cerr << "Error opening output file." << endl;    
+        }
+        outputFile<<"Most texts Writen:"<<endl;
+        outputFile<<messages[0].sender + " has send: " << countMessagesBySender(messages, messages[0].sender)<<endl;
+        outputFile<<messages[1].sender + " has send: " << countMessagesBySender(messages, messages[1].sender)<<endl;
+        string mostILoveYouSender = findMostILoveYouSender(messages);
+        cout<<mostILoveYouSender +" Really"<<endl;
+        if (!mostILoveYouSender.empty()) {
+            
+            outputFile << mostILoveYouSender << " has sent the most 'I love you' or similar messages." << endl;
+        }
+    }
+    catch(const exception& e)
+    {
+        cerr << e.what() << '\n';
+    }
+}
 
 int main() {
-    std::string filename = "WhatsAppChat_MFRabbit.txt"; // Change this to the path of your text file
-    std::string outputFilename = "message_counts.txt"; // Output file for message counts
+    string filename = "WhatsAppChat_MFRabbit.txt"; // Change this to the path of your text file
+    string outputFilename = "message.txt"; // Output file for message counts
 
-    std::unordered_map<std::string, int> messageCount = readfile(filename);
-
-    // Create a vector of pairs (sender, count) for sorting
-    std::vector<std::pair<std::string, int>> messageCountVec(messageCount.begin(), messageCount.end());
-
-    // Sort the vector by counts in descending order
-    std::sort(messageCountVec.begin(), messageCountVec.end(), [](const auto& a, const auto& b) {
-        return a.second > b.second; // Compare counts
-    });
-
-    // Write message counts to output file
-    std::ofstream outputFile(outputFilename);
-    if (!outputFile.is_open()) {
-        std::cerr << "Error opening output file." << std::endl;
-        return 1;
-    }
-
-    for (const auto& pair : messageCountVec) {
-        outputFile << pair.first << ": " << pair.second << std::endl;
-    }
-
-    outputFile.close();
-
-    std::cout << "Message counts have been written to " << outputFilename << std::endl;
+    vector<Message> messages = readfile(filename);
+    writefile(outputFilename,messages);
 
     return 0;
 }
